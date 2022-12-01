@@ -24,10 +24,13 @@ from termcolor import colored
 from termcolor import cprint
 
 from .exceptions import AocdError
+from .exceptions import DeadTokenError
+from .exceptions import UnknownUserError
 from .exceptions import PuzzleUnsolvedError
 from .exceptions import PuzzleLockedError
 from .utils import AOC_TZ
 from .utils import _ensure_intermediate_dirs
+from .utils import atomic_write_file
 from .utils import get_owner
 from .version import __version__
 
@@ -47,6 +50,15 @@ class User(object):
     def __init__(self, token):
         self.token = token
         self._owner = "unknown.unknown.0"
+
+    @classmethod
+    def from_id(cls, id):
+        users = _load_users()
+        if id not in users:
+            raise UnknownUserError("User with id '{}' is not known".format(id))
+        user = cls(users[id])
+        user._owner = id
+        return user
 
     @property
     def auth(self):
@@ -99,6 +111,11 @@ class User(object):
             response = requests.get(url, cookies=self.auth, headers=USER_AGENT)
             response.raise_for_status()
             soup = bs4.BeautifulSoup(response.text, "html.parser")
+            if soup.article is None and "You haven't collected any stars" in soup.main.text:
+                continue
+            if soup.article.pre is None and "overall leaderboard" in soup.article.text:
+                msg = "the auth token ...{} is expired or not functioning"
+                raise DeadTokenError(msg.format(self.token[-4:]))
             stats_txt = soup.article.pre.text
             lines = stats_txt.splitlines()
             lines = [x for x in lines if x.split()[0] in days]
@@ -202,10 +219,8 @@ class Puzzle(object):
             log.error(response.text)
             raise AocdError("Unexpected response")
         data = response.text
-        _ensure_intermediate_dirs(self.input_data_fname)
-        with open(self.input_data_fname, "w") as f:
-            log.info("saving the puzzle input token=%s", sanitized)
-            f.write(data)
+        log.info("saving the puzzle input token=%s", sanitized)
+        atomic_write_file(self.input_data_fname, data)
         return data.rstrip("\r\n")
 
     @property
@@ -225,9 +240,8 @@ class Puzzle(object):
         except Exception:
             log.info("unable to find example data year=%s day=%s", self.year, self.day)
             data = ""
-        with open(self.example_input_data_fname, "w") as f:
-            log.info("saving the example data")
-            f.write(data)
+        log.info("saving the example data")
+        atomic_write_file(self.example_input_data_fname, data)
         return data.rstrip("\r\n")
 
     @property
@@ -544,3 +558,13 @@ def _parse_duration(s):
         return timedelta(hours=24)
     h, m, s = [int(x) for x in s.split(":")]
     return timedelta(hours=h, minutes=m, seconds=s)
+
+
+def _load_users():
+    path = os.path.join(AOCD_CONFIG_DIR, "tokens.json")
+    try:
+        with open(path) as f:
+            users = json.load(f)
+    except IOError:
+        users = {"default": default_user().token}
+    return users
