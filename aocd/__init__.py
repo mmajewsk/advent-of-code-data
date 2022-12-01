@@ -17,6 +17,7 @@ from . import runner
 from . import transforms
 from . import utils
 from . import version
+from . import wait
 from .exceptions import AocdError
 from .exceptions import PuzzleUnsolvedError
 from .get import get_data
@@ -44,6 +45,7 @@ __all__ = [
     "AocdError",
     "PuzzleUnsolvedError",
     "AOC_TZ",
+    "wait"
 ]
 __all__ += transforms.__all__
 

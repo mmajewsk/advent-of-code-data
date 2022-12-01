@@ -18,7 +18,8 @@ setup(
         "console_scripts": [
             "aocd=aocd.cli:main",
             "aoc=aocd.runner:main",
-            "aocd-token=aocd.cookies:scrape_session_tokens"
+            "aocd-token=aocd.cookies:scrape_session_tokens",
+            "aoc-wait=aocd.wait:main"
         ],
         # https://setuptools.readthedocs.io/en/latest/setuptools.html#dynamic-discovery-of-services-and-plugins
         "adventofcode.user": [],
